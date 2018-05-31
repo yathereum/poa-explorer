@@ -2,6 +2,7 @@ defmodule ExplorerWeb.UserSocket do
   use Phoenix.Socket
 
   # channel "room:*", ExplorerWeb.RoomChannel
+  channel "user_explorer:*", ExplorerWeb.ExplorerChannel
 
   transport(:websocket, Phoenix.Transports.WebSocket, timeout: 45_000)
   # transport :longpoll, Phoenix.Transports.LongPoll

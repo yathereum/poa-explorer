@@ -10,7 +10,7 @@
         <th><%= gettext "Value" %> (<%= gettext "Ether" %>)</th>
         <th><%= gettext "Age" %></th>
       </thead>
-      <tbody>
+      <tbody id="transactions">
         <%= for transaction <- @chain.transactions do %>
         <tr data-test="chain_transaction">
           <td>
