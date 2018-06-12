@@ -148,8 +148,26 @@ defmodule Explorer.Chain do
 
   """
   @spec address_to_transactions(Address.t(), [paging_options | necessity_by_association_option]) :: Transaction.t()
-  def address_to_transactions(%Address{hash: hash}, options \\ []) when is_list(options) do
-    address_hash_to_transactions(hash, options)
+  def address_to_transactions(
+        %Address{hash: %Hash{byte_count: unquote(Hash.Truncated.byte_count())} = address_hash},
+        options \\ []
+      )
+      when is_list(options) do
+    direction = Keyword.get(options, :direction)
+    necessity_by_association = Keyword.get(options, :necessity_by_association, %{})
+    paging_options = Keyword.get(options, :paging_options, %PagingOptions{page_size: 50})
+
+    Transaction
+    |> load_contract_creation()
+    |> select_merge([_, internal_transaction], %{
+      created_contract_address_hash: internal_transaction.created_contract_address_hash
+    })
+    |> where_address_fields_match(address_hash, direction)
+    |> page_transaction(paging_options)
+    |> limit(^paging_options.page_size)
+    |> order_by([transaction], desc: transaction.block_number, desc: transaction.index)
+    |> join_associations(necessity_by_association)
+    |> Repo.all()
   end
 
   @doc """
@@ -1673,28 +1691,6 @@ defmodule Explorer.Chain do
   @spec value(Transaction.t(), :ether) :: Wei.ether()
   def value(%type{value: value}, unit) when type in [InternalTransaction, Transaction] do
     Wei.to(value, unit)
-  end
-
-  defp address_hash_to_transactions(
-         %Hash{byte_count: unquote(Hash.Truncated.byte_count())} = address_hash,
-         options
-       )
-       when is_list(options) do
-    direction = Keyword.get(options, :direction)
-    necessity_by_association = Keyword.get(options, :necessity_by_association, %{})
-    paging_options = Keyword.get(options, :paging_options, %PagingOptions{page_size: 50})
-
-    Transaction
-    |> load_contract_creation()
-    |> select_merge([_, internal_transaction], %{
-      created_contract_address_hash: internal_transaction.created_contract_address_hash
-    })
-    |> where_address_fields_match(address_hash, direction)
-    |> page_transaction(paging_options)
-    |> limit(^paging_options.page_size)
-    |> order_by([transaction], desc: transaction.block_number, desc: transaction.index)
-    |> join_associations(necessity_by_association)
-    |> Repo.all()
   end
 
   @spec changes_list(params :: map, [{:for, module}]) :: {:ok, changes :: map} | {:error, [Changeset.t()]}
