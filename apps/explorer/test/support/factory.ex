@@ -63,6 +63,151 @@ defmodule Explorer.Factory do
     block_hash
   end
 
+  def block_reward_factory do
+    # Generate ranges like 1 - 10,000; 10,001 - 20,000, 20,001 - 30,000; etc
+    x = sequence("block_range", & &1)
+    lower = x * Kernel.+(10_000, 1)
+    upper = Kernel.+(lower, 9_999)
+
+    wei_per_ether = Decimal.new(1_000_000_000_000_000_000)
+
+    reward_multiplier =
+      1..5
+      |> Enum.random()
+      |> Decimal.new()
+
+    reward = Decimal.mult(reward_multiplier, wei_per_ether)
+
+    %Reward{
+      block_range: %Range{from: lower, to: upper},
+      reward: reward
+    }
+  end
+
+  def data(sequence_name) do
+    unpadded =
+      sequence_name
+      |> sequence(& &1)
+      |> Integer.to_string(16)
+
+    unpadded_length = String.length(unpadded)
+
+    padded =
+      case rem(unpadded_length, 2) do
+        0 -> unpadded
+        1 -> "0" <> unpadded
+      end
+
+    {:ok, data} = Data.cast("0x#{padded}")
+
+    data
+  end
+
+  def internal_transaction_create_factory() do
+    gas = Enum.random(21_000..100_000)
+    gas_used = Enum.random(0..gas)
+
+    transaction =
+      :transaction
+      |> insert(to_address: nil, to_address_hash: nil)
+      |> with_block()
+
+    %InternalTransaction{
+      created_contract_code: data(:internal_transaction_created_contract_code),
+      created_contract_address_hash: insert(:address).hash,
+      from_address_hash: insert(:address).hash,
+      gas: gas,
+      gas_used: gas_used,
+      # caller MUST suppy `index`
+      init: data(:internal_transaction_init),
+      trace_address: [],
+      transaction_hash: transaction.hash,
+      type: :create,
+      value: sequence("internal_transaction_value", &Decimal.new(&1))
+    }
+  end
+
+  def internal_transaction_factory() do
+    gas = Enum.random(21_000..100_000)
+    gas_used = Enum.random(0..gas)
+
+    transaction =
+      :transaction
+      |> insert()
+      |> with_block()
+
+    %InternalTransaction{
+      from_address_hash: insert(:address).hash,
+      to_address_hash: insert(:address).hash,
+      call_type: :delegatecall,
+      gas: gas,
+      gas_used: gas_used,
+      output: %Data{bytes: <<1>>},
+      # caller MUST suppy `index`
+      trace_address: [],
+      transaction_hash: transaction.hash,
+      type: :call,
+      value: sequence("internal_transaction_value", &Decimal.new(&1))
+    }
+  end
+
+  def log_factory do
+    %Log{
+      address_hash: insert(:address).hash,
+      data: data(:log_data),
+      first_topic: nil,
+      fourth_topic: nil,
+      index: 0,
+      second_topic: nil,
+      third_topic: nil,
+      transaction_hash: insert(:transaction).hash,
+      type: sequence("0x")
+    }
+  end
+
+  def market_history_factory do
+    %MarketHistory{
+      closing_price: price(),
+      opening_price: price(),
+      date: Date.utc_today()
+    }
+  end
+
+  def public_key do
+    data(:public_key)
+  end
+
+  def transaction_factory do
+    %Transaction{
+      from_address_hash: insert(:address).hash,
+      gas: Enum.random(21_000..100_000),
+      gas_price: Enum.random(10..99) * 1_000_000_00,
+      hash: transaction_hash(),
+      input: transaction_input(),
+      nonce: Enum.random(1..1_000),
+      public_key: public_key(),
+      r: sequence(:transaction_r, & &1),
+      s: sequence(:transaction_s, & &1),
+      standard_v: Enum.random(0..3),
+      to_address_hash: insert(:address).hash,
+      v: Enum.random(27..30),
+      value: Enum.random(1..100_000)
+    }
+  end
+
+  def transaction_hash do
+    {:ok, transaction_hash} =
+      "transaction_hash"
+      |> sequence(& &1)
+      |> Hash.Full.cast()
+
+    transaction_hash
+  end
+
+  def transaction_input do
+    data(:transaction_input)
+  end
+
   def with_block(%Transaction{index: nil} = transaction) do
     with_block(transaction, insert(:block))
   end
@@ -112,160 +257,15 @@ defmodule Explorer.Factory do
     |> Repo.preload(:block)
   end
 
-  def data(sequence_name) do
-    unpadded =
-      sequence_name
-      |> sequence(& &1)
-      |> Integer.to_string(16)
-
-    unpadded_length = String.length(unpadded)
-
-    padded =
-      case rem(unpadded_length, 2) do
-        0 -> unpadded
-        1 -> "0" <> unpadded
-      end
-
-    {:ok, data} = Data.cast("0x#{padded}")
-
-    data
-  end
-
-  def internal_transaction_factory() do
-    gas = Enum.random(21_000..100_000)
-    gas_used = Enum.random(0..gas)
-
-    transaction =
-      :transaction
-      |> insert()
-      |> with_block()
-
-    %InternalTransaction{
-      from_address_hash: insert(:address).hash,
-      to_address_hash: insert(:address).hash,
-      call_type: :delegatecall,
-      gas: gas,
-      gas_used: gas_used,
-      output: %Data{bytes: <<1>>},
-      # caller MUST suppy `index`
-      trace_address: [],
-      transaction_hash: transaction.hash,
-      type: :call,
-      value: sequence("internal_transaction_value", &Decimal.new(&1))
-    }
-  end
-
-  def internal_transaction_create_factory() do
-    gas = Enum.random(21_000..100_000)
-    gas_used = Enum.random(0..gas)
-
-    transaction =
-      :transaction
-      |> insert(to_address: nil, to_address_hash: nil)
-      |> with_block()
-
-    %InternalTransaction{
-      created_contract_code: data(:internal_transaction_created_contract_code),
-      created_contract_address_hash: insert(:address).hash,
-      from_address_hash: insert(:address).hash,
-      gas: gas,
-      gas_used: gas_used,
-      # caller MUST suppy `index`
-      init: data(:internal_transaction_init),
-      trace_address: [],
-      transaction_hash: transaction.hash,
-      type: :create,
-      value: sequence("internal_transaction_value", &Decimal.new(&1))
-    }
-  end
-
-  def log_factory do
-    %Log{
-      address_hash: insert(:address).hash,
-      data: data(:log_data),
-      first_topic: nil,
-      fourth_topic: nil,
-      index: 0,
-      second_topic: nil,
-      third_topic: nil,
-      transaction_hash: insert(:transaction).hash,
-      type: sequence("0x")
-    }
-  end
-
-  def public_key do
-    data(:public_key)
-  end
-
-  def market_history_factory do
-    %MarketHistory{
-      closing_price: price(),
-      opening_price: price(),
-      date: Date.utc_today()
-    }
-  end
-
-  def block_reward_factory do
-    # Generate ranges like 1 - 10,000; 10,001 - 20,000, 20,001 - 30,000; etc
-    x = sequence("block_range", & &1)
-    lower = x * Kernel.+(10_000, 1)
-    upper = Kernel.+(lower, 9_999)
-
-    wei_per_ether = Decimal.new(1_000_000_000_000_000_000)
-
-    reward_multiplier =
-      1..5
-      |> Enum.random()
-      |> Decimal.new()
-
-    reward = Decimal.mult(reward_multiplier, wei_per_ether)
-
-    %Reward{
-      block_range: %Range{from: lower, to: upper},
-      reward: reward
-    }
-  end
-
-  def transaction_factory do
-    %Transaction{
-      from_address_hash: insert(:address).hash,
-      gas: Enum.random(21_000..100_000),
-      gas_price: Enum.random(10..99) * 1_000_000_00,
-      hash: transaction_hash(),
-      input: transaction_input(),
-      nonce: Enum.random(1..1_000),
-      public_key: public_key(),
-      r: sequence(:transaction_r, & &1),
-      s: sequence(:transaction_s, & &1),
-      standard_v: Enum.random(0..3),
-      to_address_hash: insert(:address).hash,
-      v: Enum.random(27..30),
-      value: Enum.random(1..100_000)
-    }
-  end
-
-  def transaction_hash do
-    {:ok, transaction_hash} =
-      "transaction_hash"
-      |> sequence(& &1)
-      |> Hash.Full.cast()
-
-    transaction_hash
-  end
-
-  def transaction_input do
-    data(:transaction_input)
+  defmacrop coalesce(left, right) do
+    quote do
+      fragment("coalesce(?, ?)", unquote(left), unquote(right))
+    end
   end
 
   defmacrop left + right do
     quote do
       fragment("? + ?", unquote(left), unquote(right))
-    end
-  end
-
-  defmacrop coalesce(left, right) do
-    quote do
-      fragment("coalesce(?, ?)", unquote(left), unquote(right))
     end
   end
 
