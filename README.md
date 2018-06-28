@@ -60,6 +60,7 @@ Configure your local CCMenu with the following url: [`https://circleci.com/gh/po
     * `cd apps/explorer && mix sobelow --config; cd -`
     * `cd apps/explorer_web && mix sobelow --config; cd -`
   * Lint the JavaScript code: `cd apps/explorer_web/assets && npm run eslint; cd -`
+  * Test the JavaScript code: `cd apps/explorer_web/assets && npm run test; cd -`
 
 
 ## Internationalization
