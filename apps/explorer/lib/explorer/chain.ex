@@ -2103,7 +2103,7 @@ defmodule Explorer.Chain do
   :ok
   """
   @spec subscribe_to_events(chain_event()) :: :ok
-  def subscribe_to_events(event_type) when event_type in ~w(blocks logs)a do
+  def subscribe_to_events(event_type) when event_type in ~w(blocks logs transactions)a do
     Registry.register(Registry.ChainEvents, event_type, [])
     :ok
   end
@@ -2251,7 +2251,7 @@ defmodule Explorer.Chain do
   end
 
   defp broadcast_events(data) do
-    for {event_type, event_data} <- data, event_type in ~w(blocks logs)a do
+    for {event_type, event_data} <- data, event_type in ~w(blocks logs transactions)a do
       broadcast_event_data(event_type, event_data)
     end
   end
