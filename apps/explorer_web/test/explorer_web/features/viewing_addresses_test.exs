@@ -1,7 +1,9 @@
 defmodule ExplorerWeb.ViewingAddressesTest do
   use ExplorerWeb.FeatureCase, async: true
 
-  alias Explorer.Chain.Wei
+  alias Explorer.Chain
+  alias Explorer.Chain.{Address, Wei}
+  alias Explorer.ExchangeRates.Token
   alias ExplorerWeb.{AddressPage, HomePage, Notifier}
 
   setup do
@@ -259,6 +261,32 @@ defmodule ExplorerWeb.ViewingAddressesTest do
     Notifier.handle_event({:chain_event, :transactions, [transaction.hash]})
 
     assert_text(session, AddressPage.transaction_count(), "3")
+  end
+
+  test "viewing updated balance via live update", %{session: session} do
+    address = %Address{hash: hash} = insert(:address, fetched_balance: 500)
+
+    session
+    |> AddressPage.visit_page(address)
+    |> assert_text(AddressPage.balance(), "0.0000000000000005 POA")
+
+    {:ok, [^hash]} =
+      Chain.update_balances([
+        %{
+          fetched_balance: 100,
+          fetched_balance_block_number: 1,
+          hash: hash
+        }
+      ])
+
+    {:ok, updated_address} = Chain.hash_to_address(hash)
+
+    ExplorerWeb.Endpoint.broadcast!("addresses:#{hash}", "balance", %{
+      address: updated_address,
+      exchange_rate: %Token{}
+    })
+
+    assert_text(session, AddressPage.balance(), "0.0000000000000001 POA")
   end
 
   test "contract creation is shown for to_address on list page", %{
